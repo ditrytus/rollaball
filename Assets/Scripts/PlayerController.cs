@@ -4,6 +4,8 @@ using UnityEngine;
 
 public class PlayerController : MonoBehaviour
 {
+	public GameObject pickupSpawner;
+
 	public float speed = 1.0f;
 	private Rigidbody rb;
 
@@ -38,6 +40,7 @@ public class PlayerController : MonoBehaviour
         if (other.gameObject.CompareTag("pickup"))
 		{
 			DestroyObject(other.gameObject);
+			pickupSpawner.GetComponent<PickupSpawner>().SpawnPickup();
 		}
     }
 }
