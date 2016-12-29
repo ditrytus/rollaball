@@ -28,7 +28,7 @@ public class PlayerController : MonoBehaviour
 			var otherObject = contact.otherCollider.gameObject;
             if (otherObject.CompareTag("enemy"))
 			{
-				otherObject.SetActive(false);
+				rb.AddForce(contact.normal * 10, ForceMode.Impulse);
 			}
         }
     }
