@@ -32,4 +32,12 @@ public class PlayerController : MonoBehaviour
 			}
         }
     }
+
+	void OnTriggerEnter(Collider other)
+	{
+        if (other.gameObject.CompareTag("pickup"))
+		{
+			DestroyObject(other.gameObject);
+		}
+    }
 }
