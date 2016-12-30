@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class PickupSpawner : MonoBehaviour {
+public class Spawner : MonoBehaviour {
 
 	public GameObject pickup;
 
@@ -13,14 +13,9 @@ public class PickupSpawner : MonoBehaviour {
 	private float zMin = -9.0f;
 	private float zMax = 9.0f;
 
-	private float spawnY = 20.0f;
+	private float spawnY = 40.0f;
 
-	void Start()
-	{
-		SpawnPickup();
-	}
-
-	public void SpawnPickup()
+	public void Spawn()
 	{
 		Instantiate(
 			pickup,
