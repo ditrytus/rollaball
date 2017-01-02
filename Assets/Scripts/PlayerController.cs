@@ -1,6 +1,8 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
+using System;
 
 public class PlayerController : MonoBehaviour
 {
@@ -18,6 +20,15 @@ public class PlayerController : MonoBehaviour
 
 	public int Size = 3;
 
+	public int Collected = 0;
+	public int MaximumSize = 3;
+
+	public Text collectedText;
+	public Text maxSizeText;
+	public Text timeText;
+
+	private DateTime startTime;
+
 	public float GetMass()
 	{
 		return Mathf.Pow(GetDiameter(), massGain) * density * Mathf.PI;
@@ -28,11 +39,41 @@ public class PlayerController : MonoBehaviour
 		return Size * 0.333f;
 	}
 
+	public enum PlayerEvent
+	{
+		CollectedPickup,
+		HitByEnemy
+	}
+
 	private Vector3 initialScale;
 
 	void Start()
 	{
 		rb = GetComponent<Rigidbody>();
+		Grow();
+		startTime = DateTime.Now;
+		InvokeRepeating("UpdateTimer", 0.01f, 0.01f);
+	}
+
+	public void UpdateTimer()
+	{
+		var duration = DateTime.Now - startTime;
+		var minutes = duration.Minutes.ToString("00");
+		var seconds = duration.Seconds.ToString("00");
+		var fractions = (duration.Milliseconds / 100).ToString("0");
+		timeText.text = string.Format("TIME: {0}:{1}.{2}", minutes, seconds, fractions);
+	}
+
+	public void HandleEvent(PlayerEvent playerEvent)
+	{
+		switch (playerEvent)
+		{
+			case PlayerEvent.CollectedPickup: Size++; Collected++; break;
+			case PlayerEvent.HitByEnemy: Size--; break;
+		}
+		MaximumSize = Mathf.Max(Size, MaximumSize);
+		collectedText.text = "PILLS: " + Collected.ToString();
+		maxSizeText.text = "MAX SIZE: " + MaximumSize.ToString();
 		Grow();
 	}
 
@@ -63,8 +104,7 @@ public class PlayerController : MonoBehaviour
             if (otherObject.CompareTag("enemy"))
 			{
 				rb.AddForce(contact.normal * impulse * GetMass(), ForceMode.Impulse);
-				Size--;
-				Grow();
+				HandleEvent(PlayerEvent.HitByEnemy);
 			}
         }
     }
@@ -75,8 +115,7 @@ public class PlayerController : MonoBehaviour
 		{
 			DestroyObject(other.gameObject);
 			pickupSpawner.GetComponent<Spawner>().Spawn();
-			Size++;
-			Grow();
+			HandleEvent(PlayerEvent.CollectedPickup);
 		}
     }
 }
