@@ -1,14 +1,20 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.UI;
 using System;
+using UniRx;
+using UniRx.Triggers;
 
 public class PlayerController : MonoBehaviour
 {
 	public GameObject pickupSpawner;
 
-	public float speed = 1.0f;
+	private Rigidbody rigidBody;
+
+	public Text collectedText;
+
+	public Text maxSizeText;
+
+	public Text timeText;
 
 	public float impulse = 10;
 
@@ -16,106 +22,106 @@ public class PlayerController : MonoBehaviour
 
 	public float massGain = 3.0f;
 
-	private Rigidbody rb;
+	public float speed = 1.0f;
 
-	public int Size = 3;
+	public IntReactiveProperty Size { get; private set; }
 
-	public int Collected = 0;
-	public int MaximumSize = 3;
+	public IntReactiveProperty Collected { get; private set; }
 
-	public Text collectedText;
-	public Text maxSizeText;
-	public Text timeText;
+	public IntReactiveProperty MaximumSize { get; private set; }
+
+	public ReadOnlyReactiveProperty<float> Diameter { get; private set; }
+
+	public ReadOnlyReactiveProperty<float> Mass { get; private set; }
 
 	private DateTime startTime;
 
-	public float GetMass()
-	{
-		return Mathf.Pow(GetDiameter(), massGain) * density * Mathf.PI;
-	}
-
-	public float GetDiameter()
-	{
-		return Size * 0.333f;
-	}
-
-	public enum PlayerEvent
-	{
-		CollectedPickup,
-		HitByEnemy
-	}
-
-	private Vector3 initialScale;
-
 	void Start()
 	{
-		rb = GetComponent<Rigidbody>();
-		Grow();
+		rigidBody = GetComponent<Rigidbody>();
+
 		startTime = DateTime.Now;
-		InvokeRepeating("UpdateTimer", 0.01f, 0.01f);
-	}
 
-	public void UpdateTimer()
-	{
-		var duration = DateTime.Now - startTime;
-		var minutes = duration.Minutes.ToString("00");
-		var seconds = duration.Seconds.ToString("00");
-		var fractions = (duration.Milliseconds / 100).ToString("0");
-		timeText.text = string.Format("TIME: {0}:{1}.{2}", minutes, seconds, fractions);
-	}
+		Size = new IntReactiveProperty(3);
 
-	public void HandleEvent(PlayerEvent playerEvent)
-	{
-		switch (playerEvent)
-		{
-			case PlayerEvent.CollectedPickup: Size++; Collected++; break;
-			case PlayerEvent.HitByEnemy: Size--; break;
-		}
-		MaximumSize = Mathf.Max(Size, MaximumSize);
-		collectedText.text = "PILLS: " + Collected.ToString();
-		maxSizeText.text = "MAX SIZE: " + MaximumSize.ToString();
-		Grow();
-	}
+		Collected = new IntReactiveProperty(0);
+		Collected
+			.Select(c => $"PILLS: {c}")
+			.SubscribeToText(collectedText);
 
-	private void Grow()
-	{
-		rb.mass = GetMass();
-		transform.localScale = new Vector3(
-			GetDiameter(),
-			GetDiameter(),
-			GetDiameter());
-	}
+		MaximumSize = new IntReactiveProperty(0);
+		MaximumSize
+			.Select(m => $"MAX SIZE: {m}")
+			.SubscribeToText(maxSizeText);
 
-	void FixedUpdate ()
-	{
-		float moveHorizonta = Input.GetAxis("Horizontal");
-		float moveVertical = Input.GetAxis("Vertical");
-
-		Vector3 movement = new Vector3(moveHorizonta, 0.0f, moveVertical);
-
-		rb.AddForce(movement * speed);
-	}
-
-	void OnCollisionEnter(Collision collision)
-	{
-		foreach (ContactPoint contact in collision.contacts)
-		{
-			var otherObject = contact.otherCollider.gameObject;
-            if (otherObject.CompareTag("enemy"))
+		Size
+			.Subscribe(s =>
 			{
-				rb.AddForce(contact.normal * impulse * GetMass(), ForceMode.Impulse);
-				HandleEvent(PlayerEvent.HitByEnemy);
-			}
-        }
-    }
+				MaximumSize.Value = Math.Max(MaximumSize.Value, s);
+			});
 
-	void OnTriggerEnter(Collider other)
-	{
-        if (other.gameObject.CompareTag("pickup"))
-		{
-			DestroyObject(other.gameObject);
-			pickupSpawner.GetComponent<Spawner>().Spawn();
-			HandleEvent(PlayerEvent.CollectedPickup);
-		}
-    }
+		Diameter = Size
+			.Select(s => s * 0.333f)
+			.ToReadOnlyReactiveProperty();
+		Diameter
+			.SubscribeOnMainThread()
+			.Subscribe(diameter =>
+			{
+				transform.localScale = new Vector3(diameter, diameter, diameter);
+			});
+
+		Mass = Diameter
+			.Select(d => Mathf.Pow(d, massGain) * density * Mathf.PI)
+			.ToReadOnlyReactiveProperty();
+		Mass
+			.SubscribeOnMainThread()
+			.Subscribe(mass =>
+			{
+				rigidBody.mass = mass;
+			});
+
+        Observable
+			.Interval(TimeSpan.FromMilliseconds(10))
+			.Select(l => DateTime.Now - startTime)
+			.Select(duration => string.Format(
+				"TIME: {0}:{1}.{2}",
+				duration.Minutes.ToString("00"),
+				duration.Seconds.ToString("00"),
+				(duration.Milliseconds / 100).ToString("0")))
+			.SubscribeToText(timeText);
+
+		Observable
+			.EveryFixedUpdate()
+			.SubscribeOnMainThread()
+			.Subscribe(_ =>
+			{
+				float moveHorizonta = Input.GetAxis("Horizontal");
+				float moveVertical = Input.GetAxis("Vertical");
+
+				Vector3 movement = new Vector3(moveHorizonta, 0.0f, moveVertical);
+
+				rigidBody.AddForce(movement * speed);
+			});
+
+		this.OnTriggerEnterAsObservable()
+			.Where(other => other.gameObject.CompareTag("pickup"))
+			.SubscribeOnMainThread()
+			.Subscribe(other =>
+			{
+				DestroyObject(other.gameObject);
+				pickupSpawner.GetComponent<Spawner>().Spawn();
+				Size.Value++;
+				Collected.Value++;
+			});
+
+		this.OnCollisionEnterAsObservable()
+			.SelectMany(collision => collision.contacts)
+			.Where(contact => contact.otherCollider.gameObject.CompareTag("enemy"))
+			.SubscribeOnMainThread()
+			.Subscribe(contact =>
+			{
+				rigidBody.AddForce(contact.normal * impulse * Mass.Value, ForceMode.Impulse);
+				Size.Value--;
+			});
+	}
 }
