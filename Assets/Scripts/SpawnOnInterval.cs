@@ -1,6 +1,8 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
+using System;
 using UnityEngine;
+using UniRx;
 
 public class SpawnOnInterval : MonoBehaviour {
 
@@ -10,12 +12,14 @@ public class SpawnOnInterval : MonoBehaviour {
 	public float interval = 1.0f;
 
 	// Use this for initialization
-	void Start () {
-		InvokeRepeating("Spawn", delay, interval);
-	}
-
-	public void Spawn()
+	void Start ()
 	{
-		spawner.GetComponent<Spawner>().Spawn();
+		Observable
+			.Interval(TimeSpan.FromSeconds(interval))
+			.Delay(TimeSpan.FromSeconds(delay))
+			.Subscribe(_ => 
+			{
+				spawner.GetComponent<Spawner>().Spawn();
+			});
 	}
 }

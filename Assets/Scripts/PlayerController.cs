@@ -14,8 +14,6 @@ public class PlayerController : MonoBehaviour
 
 	public Text maxSizeText;
 
-	public Text timeText;
-
 	public float impulse = 10;
 
 	public float density = 4.0f / 3.0f;
@@ -34,13 +32,9 @@ public class PlayerController : MonoBehaviour
 
 	public ReadOnlyReactiveProperty<float> Mass { get; private set; }
 
-	private DateTime startTime;
-
 	void Start()
 	{
 		rigidBody = GetComponent<Rigidbody>();
-
-		startTime = DateTime.Now;
 
 		Size = new IntReactiveProperty(3);
 
@@ -80,23 +74,13 @@ public class PlayerController : MonoBehaviour
 				rigidBody.mass = mass;
 			});
 
-        Observable
-			.Interval(TimeSpan.FromMilliseconds(10))
-			.Select(l => DateTime.Now - startTime)
-			.Select(duration => string.Format(
-				"TIME: {0}:{1}.{2}",
-				duration.Minutes.ToString("00"),
-				duration.Seconds.ToString("00"),
-				(duration.Milliseconds / 100).ToString("0")))
-			.SubscribeToText(timeText);
-
 		Observable
 			.EveryFixedUpdate()
 			.SubscribeOnMainThread()
 			.Subscribe(_ =>
 			{
-				float moveHorizonta = Input.GetAxis("Horizontal");
-				float moveVertical = Input.GetAxis("Vertical");
+				float moveHorizonta = Input.GetAxis(Axes.Horizontal);
+				float moveVertical = Input.GetAxis(Axes.Vertical);
 
 				Vector3 movement = new Vector3(moveHorizonta, 0.0f, moveVertical);
 
@@ -104,7 +88,7 @@ public class PlayerController : MonoBehaviour
 			});
 
 		this.OnTriggerEnterAsObservable()
-			.Where(other => other.gameObject.CompareTag("pickup"))
+			.Where(other => other.gameObject.CompareTag(Tags.Pickup))
 			.SubscribeOnMainThread()
 			.Subscribe(other =>
 			{
@@ -116,7 +100,7 @@ public class PlayerController : MonoBehaviour
 
 		this.OnCollisionEnterAsObservable()
 			.SelectMany(collision => collision.contacts)
-			.Where(contact => contact.otherCollider.gameObject.CompareTag("enemy"))
+			.Where(contact => contact.otherCollider.gameObject.CompareTag(Tags.Enemy))
 			.SubscribeOnMainThread()
 			.Subscribe(contact =>
 			{

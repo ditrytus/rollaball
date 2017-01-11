@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using UniRx;
 
 public class MainMenuController : MonoBehaviour {
 
@@ -11,8 +12,12 @@ public class MainMenuController : MonoBehaviour {
 
 	// Use this for initialization
 	void Start () {
+
 		Time.timeScale = 0;
-		startButton.onClick.AddListener(StartGame);
+		
+		startButton.onClick
+			.AsObservable()
+			.Subscribe(_ => StartGame());
 	}
 	
 	void StartGame() {
